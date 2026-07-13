@@ -17,7 +17,8 @@
 // Adapters NEVER reimplement the decision. They extract the command string the
 // caller is about to run and delegate to the guard.
 
-import { execFileSync, readFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 // --- naming (mirror of scripts/require-worktree.sh / src/constants.ts) -------
@@ -137,10 +138,12 @@ function runHook() {
 }
 
 // Run only when invoked directly as a script; importing the module (for tests)
-// must NOT trigger the hook.
+// must NOT trigger the hook. realpathSync resolves symlinks (e.g. macOS
+// /tmp → /private/tmp) so the comparison matches import.meta.url, which
+// Node resolves to the real path.
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
 ) {
   try {
     runHook();
