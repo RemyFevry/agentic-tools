@@ -19,20 +19,23 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-      - name: Install Veye
+- name: Install Veye
+        id: install
         env:
-          VEYE_VERSION: "0.1.0"
+          VEYE_VERSION: '0.1.0'
         run: |
           # Try to install veye from npm first. If that fails (not yet
           # published), skip the gate with a warning instead of failing
           # the PR. Once veye is on npm, this fallback can be removed.
           if npm install -g "veye@${VEYE_VERSION}" 2>/dev/null; then
             echo "veye installed from npm"
+            echo "veye_available=true" >> $GITHUB_OUTPUT
           else
             echo "::warning::veye is not yet published to npm; gate skipped. See https://github.com/RemyFevry/fil"
-            exit 0
+            echo "veye_available=false" >> $GITHUB_OUTPUT
           fi
       - name: Run freshness gate
+        if: steps.install.outputs.veye_available == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
