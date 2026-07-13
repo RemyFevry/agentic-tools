@@ -14,7 +14,11 @@
     "prepare": "lefthook install || true"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
-    "prettier": "^3.9.5"
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.5",
+    "typescript-eslint": "^8.63.0"
   }
 }
