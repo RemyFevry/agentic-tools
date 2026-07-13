@@ -1,0 +1,41 @@
+cadence: event-driven
+combinator: weighted-avg
+exclude: []
+freshness_block:
+  status_emoji:
+    critical: 🔴
+    fresh: 🟢
+    warning: 🟡
+  status_style: emoji
+gate:
+  docs_only_label: veye:docs-only
+  mode: advisory
+kpi_modes:
+  conformance: advisory
+  contradictions: advisory
+kpi_params:
+  age:
+    fresh_window: 30
+    stale_horizon: 180
+  coverage_drift:
+    penalty_per_ref: 20
+  direct_code_delta:
+    commits_threshold: 50
+    lines_threshold: 500
+  transitive_staleness:
+    mode: min
+schema_version: 1
+sections: {}
+source_adapters: []
+status_thresholds:
+  fresh: 80
+  warning: 60
+threshold: 75
+timezone: UTC
+weights:
+  age: 0.2
+  coverage_drift: 0.25
+  direct_code_delta: 0.35
+  transitive_staleness: 0.2
+wiki_dist_root: docs/wiki.dist/
+wiki_root: docs/wiki/

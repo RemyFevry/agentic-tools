@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  paths-ignore:
+    - .veye/freshness.json
   push:
     branches: [main]
   pull_request:
