@@ -1,0 +1,52 @@
+name: Publish berth
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run (don't actually publish)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: publish-berth
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish @color-sunset/berth
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter berth build
+
+      - name: Publish (dry-run)
+        if: ${{ github.event.inputs.dry-run == 'true' }}
+        run: pnpm --filter berth publish --access public --no-git-checks --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish
+        if: ${{ github.event.inputs.dry-run != 'true' }}
+        run: pnpm --filter berth publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
