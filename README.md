@@ -1,6 +1,6 @@
 # agentic-tools
 
-Open-source tools for agentic software development.
+Open-source tools for agentic software development (early/experimental).
 
 ## Packages
 
