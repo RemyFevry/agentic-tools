@@ -16,6 +16,8 @@ permissions:
 
 jobs:
   compute:
+    # continue-on-error: the gate will fail until Veye is published to npm.
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
