@@ -183,6 +183,85 @@ Remove the files listed above from the target repo and revert the
 hooks/keys were preserved verbatim). For a clean record, `git checkout` /
 `git clean` the created paths.
 
+## Orchestrator (Module 2)
+
+On top of the trunk guard, berth provides an orchestration topology: one
+**master** (layer 0) session that runs in the primary checkout and dispatches
+implementation work to **layer-1** subagents (new tab + new worktree) and
+**layer-2** subagents (pane split, shared worktree). Max depth is 2.
+
+```text
+Workspace  (one herdr workspace — the whole session)
+│
+├─ Tab 1 — MASTER (layer 0)      orchestrator; runs in the primary with the hatch
+│
+├─ Tab 2 — layer-1 agent A       ← own worktree (branch a)
+│    ├─ pane A.0  (the layer-1 agent)
+│    └─ pane A.1  (layer-2 subagent)   ← shares worktree a
+│
+└─ Tab 3 — layer-1 agent B       ← own worktree (branch b)
+     └─ pane B.0  (the layer-1 agent)
+```
+
+### The five commands
+
+| Command                                  | Who calls it    | What it does                                                                                          |
+| ---------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| `berth master [runtime]`                 | human           | launches the layer-0 master in the primary (exports `BERTH_ALLOW_MAIN_WORKTREE=1`, execs the runtime) |
+| `berth layer1 <name> <branch> [runtime]` | master          | new tab + new worktree + launch a layer-1 subagent                                                    |
+| `berth layer2 <name> [runtime]`          | a layer-1 agent | pane split in the current tab, shares the parent's worktree                                           |
+| `berth feat <branch>`                    | human           | open a Change in a linked worktree (+ optional herdr workspace)                                       |
+| `berth ship`                             | human           | close a Change: `wt merge main` (+ optional herdr close)                                              |
+
+Runtime is `opencode` (default), `claude`, or `pi`.
+
+### Layer identity env vars
+
+Each spawn injects three env vars so the agent can self-identify:
+
+| Var                    | Set to                             |
+| ---------------------- | ---------------------------------- |
+| `BERTH_AGENT_LAYER`    | `0` (master, implicit) · `1` · `2` |
+| `BERTH_AGENT_BRANCH`   | the branch the worktree is on      |
+| `BERTH_AGENT_WORKTREE` | absolute path to the worktree      |
+
+### Defense in depth
+
+The master is the **only** session that carries the trunk-orchestration hatch
+(`BERTH_ALLOW_MAIN_WORKTREE=1`). Both spawn scripts (`spawn-layer1.sh`,
+`spawn-layer2.sh`) `unset BERTH_ALLOW_MAIN_WORKTREE BERTH_MASTER_SESSION`
+before launching the runtime, so a dispatched subagent can never satisfy the
+hatch by inheritance — even if it `cd`s into the primary checkout.
+
+### Dry-run inspection
+
+`BERTH_MASTER_DRY_RUN=1 berth master [runtime]` prints the resolved runtime and
+the hatch value without launching anything — useful for scripts and inspection.
+
+### Installing the orchestrator (`berth init --with-orchestrator`)
+
+```sh
+# install the guard + adapters + the full orchestrator
+node packages/berth/dist/cli.js init ./my-repo --with-orchestrator
+
+# overwrite an existing orchestrator install
+node packages/berth/dist/cli.js init ./my-repo --with-orchestrator --force
+```
+
+When `--with-orchestrator` is set, `berth init` additionally writes:
+
+| What                     | Where                                                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| master agent definitions | `.claude/agents/master.md`, `.opencode/agent/master.md`, `.pi/prompts/master.md`                                              |
+| orchestration scripts    | `scripts/master.sh`, `scripts/spawn-layer1.sh`, `scripts/spawn-layer2.sh`, `scripts/feat.sh`, `scripts/ship.sh` (mode `0755`) |
+| pnpm convenience scripts | merged into the target's `package.json` (`master`, `layer1`, `layer2`, `feat`, `ship`)                                        |
+
+The master agent **orchestrates: plans, dispatches (via `berth layer1` /
+`berth layer2`), verifies — it never edits files.** Each runtime enforces the
+no-edit rule with its own mechanism: OpenCode (`permission: { edit: deny,
+write: deny }`), Claude Code (`tools:` allow-list omits Write / Edit /
+MultiEdit), Pi (prompt-only, with the guard as backstop).
+
 ## Development
 
 Requires Node.js ≥ 20 and pnpm.
