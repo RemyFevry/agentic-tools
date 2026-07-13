@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  packages/berth:
     devDependencies:
       '@eslint/js':
         specifier: ^9.39.5
