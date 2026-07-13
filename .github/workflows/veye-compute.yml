@@ -29,14 +29,19 @@ jobs:
           VEYE_VERSION: '0.1.0'
         run: |
           # Try to install veye from npm first. If that fails (not yet
-          # published), skip with a warning. Once veye is on npm, this
-          # fallback can be removed.
+          # published), build from source. Once veye is on npm, the
+          # source-build fallback can be removed.
           if npm install -g "veye@${VEYE_VERSION}" 2>/dev/null; then
             echo "veye installed from npm"
             echo "veye_available=true" >> $GITHUB_OUTPUT
           else
-            echo "::warning::veye is not yet published to npm; compute skipped. See https://github.com/RemyFevry/fil"
-            echo "veye_available=false" >> $GITHUB_OUTPUT
+            git clone --depth 1 https://github.com/RemyFevry/veye /tmp/veye
+            cd /tmp/veye
+            bun install
+            mkdir -p dist/binaries
+            bun build --compile packages/cli/src/cli.ts --outfile dist/binaries/veye
+            echo "/tmp/veye/dist/binaries" >> $GITHUB_PATH
+            echo "veye_available=true" >> $GITHUB_OUTPUT
           fi
       - name: Compute freshness
         if: steps.install.outputs.veye_available == 'true'
