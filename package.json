@@ -1,0 +1,16 @@
+{
+  "name": "agentic-tools",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "lint": "pnpm -r run lint",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "ci": "pnpm run lint && pnpm run build && pnpm run typecheck && pnpm run test",
+    "prepare": "lefthook install || true"
+  }
+}
