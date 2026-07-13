@@ -30,7 +30,8 @@ jobs:
           git clone --depth 1 https://github.com/RemyFevry/fil /tmp/veye
           cd /tmp/veye
           bun install
-          bun run build
+          mkdir -p dist/binaries
+          bun build --compile packages/cli/src/cli.ts --outfile dist/binaries/veye
           echo "/tmp/veye/dist/binaries" >> $GITHUB_PATH
       - run: veye compute
       - name: Commit freshness.json
