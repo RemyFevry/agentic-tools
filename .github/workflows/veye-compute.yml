@@ -23,7 +23,16 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-      - run: bun run veye compute
+      - name: Install Veye
+        run: |
+          # Until veye is published to npm, install it from the parent monorepo.
+          # Once veye is on npm, replace this with: npm install -g veye
+          git clone --depth 1 https://github.com/RemyFevry/fil /tmp/veye
+          cd /tmp/veye
+          bun install
+          bun run build
+          echo "/tmp/veye/dist/binaries" >> $GITHUB_PATH
+      - run: veye compute
       - name: Commit freshness.json
         run: |
           git config user.name "veye-bot"
