@@ -79,6 +79,37 @@ inherits the parent env **but** has both master hatches scrubbed, so it can neve
 satisfy either hatch by inheritance alone. All naming lives in
 [`src/constants.ts`](./src/constants.ts) — rename the tool by editing one file.
 
+## Adapters
+
+Runtime-specific shims that feed the canonical trunk guard. Each adapter
+extracts the command string the caller is about to run (`""` for edit/write
+tools), resolves the guard script, shells out to it, and **fails closed**
+(blocks) on exit 2 or any unexpected error. Adapters never reimplement the
+decision — they extract and delegate.
+
+| Adapter                     | File                                                                           | Runtime                        |
+| --------------------------- | ------------------------------------------------------------------------------ | ------------------------------ |
+| Claude Code PreToolUse hook | [`adapters/claude/worktree-guard.mjs`](./adapters/claude/worktree-guard.mjs)   | Node ESM (reads JSON on stdin) |
+| OpenCode plugin (reference) | [`adapters/opencode/worktree-guard.ts`](./adapters/opencode/worktree-guard.ts) | OpenCode plugin                |
+| Pi extension                | [`adapters/pi/worktree-guard.ts`](./adapters/pi/worktree-guard.ts)             | Pi extension                   |
+
+**Guard-path resolution** (shared by all three): if `BERTH_GATE_SCRIPT` is set
+(absolute path) use it; otherwise resolve the repo root via
+`git rev-parse --show-toplevel` and use `<root>/scripts/require-worktree.sh`.
+If neither can be found, the adapter fails closed.
+
+- The **OpenCode** adapter is the **agent-aware reference**: it tracks the
+  active agent per session and builds the guard env via `buildGuardEnv` (an
+  inlined copy of [`src/guard/build-env.ts`](./src/guard/build-env.ts)). A
+  master session asserts `BERTH_MASTER_SESSION=1`; a non-master session has
+  both master hatches scrubbed, so it can never satisfy them by inheritance.
+- The **Claude Code** and **Pi** adapters forward `process.env` unchanged —
+  the operator/launcher controls the master hatches.
+
+Each adapter is a **self-contained deployable file**. `berth init` (later) will
+scaffold copies of these into a target repo's `.claude/hooks/`,
+`.opencode/plugins/`, and `.pi/extensions/`.
+
 ## Development
 
 Requires Node.js ≥ 20 and pnpm.
