@@ -19,9 +19,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { TOOL_NAME } from "./constants.js";
+import { findPkgRoot } from "./pkg-root.js";
 
 /** Runtimes berth can wire an adapter for. */
 export type Runtime = "claude" | "opencode" | "pi";
@@ -50,6 +50,8 @@ export interface InitOptions {
   runtimes?: readonly Runtime[];
   /** Overwrite an existing install. */
   force?: boolean;
+  /** Also install the master agent defs + orchestration scripts. */
+  withOrchestrator?: boolean;
 }
 
 /** Structured result of an {@link init} run. */
@@ -64,6 +66,8 @@ export interface InitResult {
   guardPath: string;
   /** Runtimes wired this run. */
   runtimes: readonly Runtime[];
+  /** True when the orchestrator (agent defs + scripts) is installed. */
+  orchestratorInstalled: boolean;
   /** Single-line, user-facing status message. */
   message: string;
 }
@@ -159,39 +163,7 @@ function isBerthHookGroup(group: Json): boolean {
 
 // --- package-root resolution -------------------------------------------------
 
-/**
- * Walk up from this module to the nearest directory whose `package.json` is
- * berth's. Used to locate the source templates (`scripts/`, `adapters/`).
- */
-function findPkgRoot(): string {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  while (true) {
-    const pkgPath = join(dir, "package.json");
-    if (existsSync(pkgPath)) {
-      try {
-        const pkg: unknown = JSON.parse(readFileSync(pkgPath, "utf8"));
-        if (
-          pkg &&
-          typeof pkg === "object" &&
-          !Array.isArray(pkg) &&
-          (pkg as JsonObject)["name"] === TOOL_NAME
-        ) {
-          return dir;
-        }
-      } catch {
-        // Ignore unreadable package.json and keep walking.
-      }
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      throw new InitError(
-        `${TOOL_NAME}: could not locate the package root`,
-        EXIT_UNEXPECTED,
-      );
-    }
-    dir = parent;
-  }
-}
+// findPkgRoot is imported from ./pkg-root.js (shared with the CLI router).
 
 // --- runtime parsing ---------------------------------------------------------
 
@@ -247,6 +219,76 @@ function adapterDestinations(target: string): Record<Runtime, string> {
   };
 }
 
+// --- orchestrator sources / destinations -------------------------------------
+
+/** The five orchestration scripts, in canonical order. */
+const ORCHESTRATOR_SCRIPT_NAMES = [
+  "master.sh",
+  "spawn-layer1.sh",
+  "spawn-layer2.sh",
+  "feat.sh",
+  "ship.sh",
+] as const;
+
+/** Map each runtime to its source master-agent-definition template. */
+function masterAgentSources(pkgRoot: string): Record<Runtime, string> {
+  return {
+    claude: join(pkgRoot, "adapters", "claude", "master.md"),
+    opencode: join(pkgRoot, "adapters", "opencode", "master.md"),
+    pi: join(pkgRoot, "adapters", "pi", "master.md"),
+  };
+}
+
+/** Map each runtime to its destination master-agent path inside the target. */
+function masterAgentDestinations(target: string): Record<Runtime, string> {
+  return {
+    claude: join(target, ".claude", "agents", "master.md"),
+    opencode: join(target, ".opencode", "agent", "master.md"),
+    pi: join(target, ".pi", "prompts", "master.md"),
+  };
+}
+
+/** pnpm convenience scripts registered when the orchestrator is installed. */
+const ORCHESTRATOR_PNPM_SCRIPTS: Record<string, string> = {
+  master: "bash scripts/master.sh",
+  layer1: "bash scripts/spawn-layer1.sh",
+  layer2: "bash scripts/spawn-layer2.sh",
+  feat: "bash scripts/feat.sh",
+  ship: "bash scripts/ship.sh",
+};
+
+/**
+ * Merge the orchestrator convenience scripts into the target's
+ * `package.json`, preserving every existing script key. Returns the path to
+ * the written `package.json` (added to {@link InitResult.writtenFiles}), or
+ * `null` when the target has no `package.json` (or it is malformed).
+ */
+function mergeOrchestratorPnpmScripts(target: string): string | null {
+  const pkgPath = join(target, "package.json");
+  if (!existsSync(pkgPath)) return null;
+  let pkg: JsonObject;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(pkgPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    pkg = parsed as JsonObject;
+  } catch {
+    return null;
+  }
+  const scriptsVal = pkg["scripts"];
+  const scripts: JsonObject =
+    scriptsVal && typeof scriptsVal === "object" && !Array.isArray(scriptsVal)
+      ? (scriptsVal as JsonObject)
+      : {};
+  pkg["scripts"] = scripts;
+  for (const [key, val] of Object.entries(ORCHESTRATOR_PNPM_SCRIPTS)) {
+    scripts[key] = val;
+  }
+  writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
+  return pkgPath;
+}
+
 /**
  * Install the trunk guard + the requested runtime adapters into `target`.
  *
@@ -257,6 +299,7 @@ function adapterDestinations(target: string): Record<Runtime, string> {
  */
 export function init(options: InitOptions): InitResult {
   const force = options.force === true;
+  const withOrchestrator = options.withOrchestrator === true;
   const runtimes =
     options.runtimes && options.runtimes.length > 0
       ? options.runtimes
@@ -289,10 +332,25 @@ export function init(options: InitOptions): InitResult {
   }
 
   // 3. Locate the source templates relative to berth's package root.
-  const pkgRoot = findPkgRoot();
+  let pkgRoot: string;
+  try {
+    pkgRoot = findPkgRoot();
+  } catch (e) {
+    throw new InitError(String(e), EXIT_UNEXPECTED);
+  }
   const guardSrc = join(pkgRoot, "scripts", "require-worktree.sh");
   const srcMap = adapterSources(pkgRoot);
-  for (const path of [guardSrc, ...runtimes.map((r) => srcMap[r])]) {
+  const masterSrcMap = withOrchestrator ? masterAgentSources(pkgRoot) : null;
+  const orchestratorScriptSrcs = withOrchestrator
+    ? ORCHESTRATOR_SCRIPT_NAMES.map((n) => join(pkgRoot, "scripts", n))
+    : [];
+  const requiredTemplates = [
+    guardSrc,
+    ...runtimes.map((r) => srcMap[r]),
+    ...(masterSrcMap ? runtimes.map((r) => masterSrcMap[r]) : []),
+    ...orchestratorScriptSrcs,
+  ];
+  for (const path of requiredTemplates) {
     if (!existsSync(path)) {
       throw new InitError(
         `${TOOL_NAME}: template missing: ${path}`,
@@ -308,6 +366,20 @@ export function init(options: InitOptions): InitResult {
     { src: guardSrc, dest: guardDest, mode: 0o755 },
     ...runtimes.map((r) => ({ src: srcMap[r], dest: destMap[r] })),
   ];
+  if (withOrchestrator) {
+    const masterDestMap = masterAgentDestinations(target);
+    copies.push(
+      ...ORCHESTRATOR_SCRIPT_NAMES.map((name) => ({
+        src: join(pkgRoot, "scripts", name),
+        dest: join(target, "scripts", name),
+        mode: 0o755,
+      })),
+      ...runtimes.map((r) => ({
+        src: masterSrcMap![r],
+        dest: masterDestMap[r],
+      })),
+    );
+  }
   const wireClaude = runtimes.includes("claude");
 
   // 5. Idempotency: gate + all requested adapters already in place -> no-op.
@@ -319,6 +391,7 @@ export function init(options: InitOptions): InitResult {
       writtenFiles: [],
       guardPath: guardDest,
       runtimes,
+      orchestratorInstalled: withOrchestrator,
       message: `${TOOL_NAME}: already installed (use --force to overwrite)`,
     };
   }
@@ -352,12 +425,19 @@ export function init(options: InitOptions): InitResult {
     writtenFiles.push(settingsPath);
   }
 
+  // 9. Merge orchestrator convenience scripts into the target's package.json.
+  if (withOrchestrator) {
+    const pkgPath = mergeOrchestratorPnpmScripts(target);
+    if (pkgPath) writtenFiles.push(pkgPath);
+  }
+
   return {
     alreadyInstalled: false,
     target,
     writtenFiles,
     guardPath: guardDest,
     runtimes,
+    orchestratorInstalled: withOrchestrator,
     message: `${TOOL_NAME}: installed trunk guard into ${target}`,
   };
 }
