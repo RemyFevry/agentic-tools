@@ -106,9 +106,82 @@ If neither can be found, the adapter fails closed.
 - The **Claude Code** and **Pi** adapters forward `process.env` unchanged —
   the operator/launcher controls the master hatches.
 
-Each adapter is a **self-contained deployable file**. `berth init` (later) will
-scaffold copies of these into a target repo's `.claude/hooks/`,
-`.opencode/plugins/`, and `.pi/extensions/`.
+Each adapter is a **self-contained deployable file**. `berth init` scaffolds
+copies of these into a target repo's `.claude/hooks/`, `.opencode/plugins/`,
+and `.pi/extensions/`.
+
+## Installing the guard into a repo (`berth init`)
+
+`berth init` wires the canonical guard + the requested runtime adapter(s) into a
+target git repo so its primary checkout is protected from direct agent edits.
+It is **atomic** (plans every write, writes nothing until every precondition
+passes), **idempotent** (a second run is a clean no-op), and **fail-closed**
+(refuses non-git targets and unforced overwrites).
+
+### Install (from source)
+
+berth is not yet published to npm — it is `"private"` and is meant to be run
+from this repo for now.
+
+```sh
+git clone <this-repo> agentic-tools
+cd agentic-tools
+pnpm install
+pnpm --filter berth build      # emits dist/cli.js (+ chmods it executable)
+```
+
+### Usage
+
+```sh
+# install the guard + all three runtime adapters into ./my-repo
+node packages/berth/dist/cli.js init ./my-repo --runtime claude,opencode,pi
+
+# only Claude Code (the default target is the current directory)
+node packages/berth/dist/cli.js init --runtime claude
+
+# overwrite an existing install
+node packages/berth/dist/cli.js init ./my-repo --force
+```
+
+```
+berth init [target] [--runtime <list>] [--force]
+  target     repo path to install into (default: current directory)
+  --runtime  comma-separated subset of: claude,opencode,pi  (default: all three)
+  --force    overwrite an existing install
+```
+
+Exit codes: `0` success (or already installed), `1` precondition error (not a
+git repo, conflict, bad args), `2` unexpected error.
+
+### What `init` writes
+
+| Runtime    | Files written into the target repo                                        |
+| ---------- | ------------------------------------------------------------------------- |
+| (always)   | `scripts/require-worktree.sh` (copied verbatim, mode `0755`)              |
+| `claude`   | `.claude/hooks/worktree-guard.mjs` + a **merged** `.claude/settings.json` |
+| `opencode` | `.opencode/plugins/worktree-guard.ts`                                     |
+| `pi`       | `.pi/extensions/worktree-guard.ts`                                        |
+
+The Claude Code `settings.json` merge adds a `PreToolUse` hook (matcher
+`Write|Edit|MultiEdit|Bash`) pointing at the adapter, and **preserves** every
+existing key and hook — it never clobbers. The resolved guard path is printed in
+the install summary.
+
+### Next steps after install
+
+- **Claude Code:** restart your session so the `PreToolUse` hook loads.
+- **OpenCode:** ensure `@opencode-ai/plugin` is available in the project.
+- **Pi:** restart Pi to load the extension.
+
+The guard then blocks edits in the primary checkout; move work into a linked
+worktree first: `wt switch -c <branch>`.
+
+### Uninstall
+
+Remove the files listed above from the target repo and revert the
+`.claude/settings.json` merge (delete the berth `PreToolUse` entry; any other
+hooks/keys were preserved verbatim). For a clean record, `git checkout` /
+`git clean` the created paths.
 
 ## Development
 
