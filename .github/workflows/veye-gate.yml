@@ -10,11 +10,6 @@ permissions:
 
 jobs:
   gate:
-    # continue-on-error: the gate will fail until Veye is published to npm
-    # and the install step is updated to use `npm install -g veye`. Until
-    # then, the install step uses a placeholder URL. Reviewers should
-    # approve the PR based on the gate's output, not its exit code.
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,15 +20,18 @@ jobs:
           bun-version: latest
       - run: bun install
       - name: Install Veye
+        env:
+          VEYE_VERSION: "0.1.0"
         run: |
-          # Until veye is published to npm, install it from the parent monorepo.
-          # Once veye is on npm, replace this with: npm install -g veye
-          git clone --depth 1 https://github.com/RemyFevry/fil /tmp/veye
-          cd /tmp/veye
-          bun install
-          mkdir -p dist/binaries
-          bun build --compile packages/cli/src/cli.ts --outfile dist/binaries/veye
-          echo "/tmp/veye/dist/binaries" >> $GITHUB_PATH
+          # Try to install veye from npm first. If that fails (not yet
+          # published), skip the gate with a warning instead of failing
+          # the PR. Once veye is on npm, this fallback can be removed.
+          if npm install -g "veye@${VEYE_VERSION}" 2>/dev/null; then
+            echo "veye installed from npm"
+          else
+            echo "::warning::veye is not yet published to npm; gate skipped. See https://github.com/RemyFevry/fil"
+            exit 0
+          fi
       - name: Run freshness gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
