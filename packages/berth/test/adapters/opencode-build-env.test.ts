@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { buildGuardEnv } from "../../adapters/opencode/worktree-guard.js";
+import { __internal } from "../../adapters/opencode/worktree-guard.js";
+
+const { buildGuardEnv } = __internal;
 
 const ALLOW = "BERTH_ALLOW_MAIN_WORKTREE";
 const MASTER = "BERTH_MASTER_SESSION";

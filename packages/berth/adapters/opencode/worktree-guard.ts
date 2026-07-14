@@ -64,7 +64,7 @@ const ORCHESTRATOR_AGENT = "orchestrator";
  *
  * Unrelated keys are always preserved. The input env is never mutated.
  */
-export function buildGuardEnv(processEnv: Env, isMaster: boolean): Env {
+function buildGuardEnv(processEnv: Env, isMaster: boolean): Env {
   const env: Env = { ...processEnv };
   if (isMaster) {
     env[MASTER_SESSION_ENV] = "1";
@@ -147,7 +147,7 @@ function runGate(command: string, env: Env, cwd?: string): void {
  *
  * Pure + side-effect free so it can be unit-tested in isolation.
  */
-export function extractOpenCodeCommand(args: unknown): string {
+function extractOpenCodeCommand(args: unknown): string {
   if (args && typeof args === "object" && "command" in args) {
     const cmd = (args as Record<string, unknown>).command;
     return typeof cmd === "string" ? cmd : "";
@@ -175,7 +175,7 @@ function validDir(p: string | undefined): string | undefined {
  *   write/edit → dirname(args.filePath) or dirname(args.path)
  *   fallback → undefined (caller uses process.cwd())
  */
-export function extractWorkDir(args: unknown): string | undefined {
+function extractWorkDir(args: unknown): string | undefined {
   if (!args || typeof args !== "object") return undefined;
   const a = args as Record<string, unknown>;
   const direct =
@@ -194,6 +194,18 @@ export function extractWorkDir(args: unknown): string | undefined {
   if (filePath) return validDir(dirname(filePath));
   return undefined;
 }
+
+/**
+ * Internal helpers exposed as a non-function namespace so OpenCode — which
+ * discovers exported FUNCTIONS and calls each as a plugin — does NOT mistake
+ * these for plugin entry points. Tests import from `__internal` instead of the
+ * bare function exports.
+ */
+export const __internal = {
+  buildGuardEnv,
+  extractOpenCodeCommand,
+  extractWorkDir,
+};
 
 /**
  * OpenCode plugin (named export). Maintains the active-agent map per session and

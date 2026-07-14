@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { extractOpenCodeCommand } from "../../adapters/opencode/worktree-guard.js";
+import { __internal } from "../../adapters/opencode/worktree-guard.js";
+
+const { extractOpenCodeCommand } = __internal;
 
 describe("extractOpenCodeCommand (output.args shape)", () => {
   it("extracts from args.command", () => {
