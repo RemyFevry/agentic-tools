@@ -32,6 +32,7 @@ const GUARDED_TOOLS = new Set(["edit", "write", "bash"]);
 export interface PiToolCallInput {
   command?: unknown;
   args?: unknown;
+  [key: string]: unknown;
 }
 
 /**
@@ -39,7 +40,7 @@ export interface PiToolCallInput {
  * versions, so every candidate is typed loosely and narrowed at runtime.
  */
 export interface PiToolCallEvent {
-  tool?: string;
+  toolName?: string;
   input?: PiToolCallInput;
   args?: { command?: unknown };
   command?: unknown;
@@ -170,7 +171,7 @@ function runGate(command: string, env: Env): PiToolCallResult | undefined {
  */
 export default function worktreeGuard(pi: PiPluginApi): void {
   pi.on("tool_call", (event) => {
-    const tool = event.tool;
+    const tool = event.toolName;
     if (!tool || !GUARDED_TOOLS.has(tool)) return undefined;
     const command = extractPiCommand(event);
     return runGate(command, process.env as Env);
