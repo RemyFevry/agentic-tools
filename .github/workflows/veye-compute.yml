@@ -1,0 +1,59 @@
+name: veye-compute
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/wiki/**
+      - src/**
+      - packages/**
+      - lib/**
+    paths-ignore:
+      - .veye/**
+
+permissions:
+  contents: write
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - name: Install Veye
+        id: install
+        env:
+          VEYE_VERSION: '0.1.0'
+        run: |
+          # Try to install veye from npm first. If that fails (not yet
+          # published), build from source. Once veye is on npm, the
+          # source-build fallback can be removed.
+          if npm install -g "veye@${VEYE_VERSION}" 2>/dev/null; then
+            echo "veye installed from npm"
+            echo "veye_available=true" >> $GITHUB_OUTPUT
+          else
+            git clone --depth 1 https://github.com/RemyFevry/veye /tmp/veye
+            cd /tmp/veye
+            bun install
+            mkdir -p dist/binaries
+            bun build --compile packages/cli/src/cli.ts --outfile dist/binaries/veye
+            echo "/tmp/veye/dist/binaries" >> $GITHUB_PATH
+            echo "veye_available=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Compute freshness
+        if: steps.install.outputs.veye_available == 'true'
+        run: veye compute
+      - name: Commit freshness.json
+        run: |
+          git config user.name "veye-bot"
+          git config user.email "veye-bot@users.noreply.github.com"
+          git add .veye/freshness.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore(veye): refresh freshness.json [skip ci]"
+            git push
+          fi

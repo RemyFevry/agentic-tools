@@ -1,0 +1,303 @@
+{
+  "computed_at": "2026-07-13T15:14:12.808Z",
+  "config_snapshot": {
+    "combinator": "weighted-avg",
+    "threshold": 75,
+    "weights": {
+      "age": 0.2,
+      "coverage_drift": 0.25,
+      "direct_code_delta": 0.35,
+      "transitive_staleness": 0.2
+    }
+  },
+  "last_successful_run": "2026-07-13T15:14:12.808Z",
+  "pages": {
+    "docs/wiki/adapter-author-guide.md": {
+      "covers": [
+        "packages/berth/adapters/claude/worktree-guard.mjs",
+        "packages/berth/adapters/opencode/worktree-guard.ts",
+        "packages/berth/adapters/pi/worktree-guard.ts"
+      ],
+      "depends_on": ["docs/wiki/architecture.md", "docs/wiki/threat-model.md"],
+      "last_verified": "2026-07-13",
+      "path": "docs/wiki/adapter-author-guide.md",
+      "score": 78.6,
+      "status": "warning",
+      "sub_scores": {
+        "age": {
+          "raw": {
+            "days_since_verified": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "coverage_drift": {
+          "raw": {
+            "broken_refs": 4,
+            "total_refs": 8
+          },
+          "score": 20,
+          "triggered": true
+        },
+        "direct_code_delta": {
+          "raw": {
+            "commits": 0,
+            "lines_changed": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "transitive_staleness": {
+          "raw": {
+            "cycle_detected": 1,
+            "dependency_count": 2,
+            "min_dep_score": 93
+          },
+          "score": 93,
+          "triggered": false
+        }
+      },
+      "threshold": 75,
+      "title": "berth adapter author guide",
+      "trigger_reasons": [
+        {
+          "detail": "4 broken refs of 8",
+          "kpi": "coverage_drift"
+        }
+      ],
+      "type": "component"
+    },
+    "docs/wiki/architecture.md": {
+      "covers": [
+        "packages/berth/src/cli.ts",
+        "packages/berth/src/scaffold.ts",
+        "packages/berth/src/guard/build-env.ts",
+        "packages/berth/src/constants.ts",
+        "packages/berth/scripts/require-worktree.sh"
+      ],
+      "depends_on": [
+        "docs/wiki/threat-model.md",
+        "docs/wiki/adapter-author-guide.md",
+        "docs/wiki/development.md"
+      ],
+      "last_verified": "2026-07-13",
+      "path": "docs/wiki/architecture.md",
+      "score": 91,
+      "status": "fresh",
+      "sub_scores": {
+        "age": {
+          "raw": {
+            "days_since_verified": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "coverage_drift": {
+          "raw": {
+            "broken_refs": 1,
+            "total_refs": 5
+          },
+          "score": 80,
+          "triggered": true
+        },
+        "direct_code_delta": {
+          "raw": {
+            "commits": 0,
+            "lines_changed": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "transitive_staleness": {
+          "raw": {
+            "cycle_detected": 1,
+            "dependency_count": 3,
+            "min_dep_score": 80
+          },
+          "score": 80,
+          "triggered": false
+        }
+      },
+      "threshold": 75,
+      "title": "berth architecture",
+      "trigger_reasons": [
+        {
+          "detail": "1 broken refs of 5",
+          "kpi": "coverage_drift"
+        }
+      ],
+      "type": "architecture"
+    },
+    "docs/wiki/development.md": {
+      "covers": [
+        "packages/berth/src/scaffold.ts",
+        "packages/berth/src/cli.ts",
+        "packages/berth/test/scaffold.test.ts",
+        "packages/berth/test/e2e-claude-adapter.test.ts"
+      ],
+      "depends_on": [
+        "docs/wiki/architecture.md",
+        "docs/wiki/adapter-author-guide.md"
+      ],
+      "last_verified": "2026-07-13",
+      "path": "docs/wiki/development.md",
+      "score": 86,
+      "status": "fresh",
+      "sub_scores": {
+        "age": {
+          "raw": {
+            "days_since_verified": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "coverage_drift": {
+          "raw": {
+            "broken_refs": 2,
+            "total_refs": 10
+          },
+          "score": 60,
+          "triggered": true
+        },
+        "direct_code_delta": {
+          "raw": {
+            "commits": 0,
+            "lines_changed": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "transitive_staleness": {
+          "raw": {
+            "cycle_detected": 1,
+            "dependency_count": 2,
+            "min_dep_score": 80
+          },
+          "score": 80,
+          "triggered": false
+        }
+      },
+      "threshold": 75,
+      "title": "berth development",
+      "trigger_reasons": [
+        {
+          "detail": "2 broken refs of 10",
+          "kpi": "coverage_drift"
+        }
+      ],
+      "type": "architecture"
+    },
+    "docs/wiki/glossary.md": {
+      "covers": [
+        "packages/berth/src/constants.ts",
+        "packages/berth/src/cli.ts"
+      ],
+      "last_verified": "2026-07-13",
+      "path": "docs/wiki/glossary.md",
+      "score": 100,
+      "status": "fresh",
+      "sub_scores": {
+        "age": {
+          "raw": {
+            "days_since_verified": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "coverage_drift": {
+          "raw": {
+            "broken_refs": 0,
+            "total_refs": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "direct_code_delta": {
+          "raw": {
+            "commits": 0,
+            "lines_changed": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "transitive_staleness": {
+          "raw": {
+            "cycle_detected": 0,
+            "dependency_count": 0
+          },
+          "score": 100,
+          "triggered": false
+        }
+      },
+      "threshold": 75,
+      "title": "berth glossary",
+      "trigger_reasons": [],
+      "type": "concept"
+    },
+    "docs/wiki/threat-model.md": {
+      "covers": [
+        "packages/berth/scripts/require-worktree.sh",
+        "packages/berth/src/guard/build-env.ts",
+        "packages/berth/scripts/master.sh",
+        "packages/berth/scripts/spawn-layer1.sh"
+      ],
+      "depends_on": ["docs/wiki/architecture.md", "docs/wiki/glossary.md"],
+      "last_verified": "2026-07-13",
+      "path": "docs/wiki/threat-model.md",
+      "score": 98.2,
+      "status": "fresh",
+      "sub_scores": {
+        "age": {
+          "raw": {
+            "days_since_verified": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "coverage_drift": {
+          "raw": {
+            "broken_refs": 0,
+            "total_refs": 1
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "direct_code_delta": {
+          "raw": {
+            "commits": 0,
+            "lines_changed": 0
+          },
+          "score": 100,
+          "triggered": false
+        },
+        "transitive_staleness": {
+          "raw": {
+            "cycle_detected": 1,
+            "dependency_count": 2,
+            "min_dep_score": 91
+          },
+          "score": 91,
+          "triggered": false
+        }
+      },
+      "threshold": 75,
+      "title": "berth threat model",
+      "trigger_reasons": [],
+      "type": "concept"
+    }
+  },
+  "schema_version": 1,
+  "summary": {
+    "acknowledged_debt": 0,
+    "average_score": 90.76,
+    "below_threshold": 0,
+    "by_type": {
+      "architecture": 2,
+      "component": 1,
+      "concept": 2,
+      "spec": 0
+    },
+    "orphans": 0,
+    "total_pages": 5
+  }
+}
