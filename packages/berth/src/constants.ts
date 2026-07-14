@@ -11,6 +11,15 @@
 export const TOOL_NAME = "berth";
 
 /**
+ * The npm package name, as it appears in `package.json#name`.
+ *
+ * Distinct from {@link TOOL_NAME} because the published package is scoped
+ * (`@color-sunset/berth`) while the user-facing name remains `berth`.
+ * Used by `findPkgRoot()` to locate the package's own root directory.
+ */
+export const PKG_NAME = "@color-sunset/berth";
+
+/**
  * Prefix for every berth environment variable.
  *
  * Examples: `BERTH_ALLOW_MAIN_WORKTREE`, `BERTH_MASTER_SESSION`.

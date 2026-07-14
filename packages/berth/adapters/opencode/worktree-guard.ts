@@ -14,7 +14,18 @@
 // adapters (which forward `process.env` unchanged), this one is AGENT-AWARE:
 // it tracks the active agent per session and builds the guard env so a
 // non-master can never satisfy a master hatch by inheritance.
+//
+// OpenCode plugin contract (@opencode-ai/plugin):
+//   A plugin is an async function `(input: PluginInput) => Promise<Hooks>`.
+//   OpenCode discovers it as a **named export** from the module. Hooks receive
+//   two arguments (input, output):
+//     - "chat.message":        input  = { sessionID, agent?, ... }
+//     - "tool.execute.before": input  = { tool, sessionID, callID }
+//                              output = { args }
+//   Throwing inside "tool.execute.before" blocks the tool call (fail closed).
+//   Types are imported from `@opencode-ai/plugin` so this can't silently drift.
 
+import type { Plugin } from "@opencode-ai/plugin";
 import {
   execFileSync,
   spawnSync,
@@ -126,62 +137,41 @@ function runGate(command: string, env: Env): void {
   );
 }
 
-// --- minimal OpenCode plugin API shapes (this repo ships no OpenCode types) --
-
-interface OpenCodeToolArgs {
-  command?: string;
-}
-interface OpenCodeToolOutput {
-  args?: OpenCodeToolArgs;
-}
-interface OpenCodeChatEvent {
-  sessionId?: string;
-  agentName?: string;
-}
-interface OpenCodeToolEvent {
-  tool?: string;
-  sessionId?: string;
-  output?: OpenCodeToolOutput;
-}
-interface OpenCodePluginApi {
-  on(event: "chat.message", handler: (e: OpenCodeChatEvent) => void): unknown;
-  on(
-    event: "tool.execute.before",
-    handler: (e: OpenCodeToolEvent) => unknown,
-  ): unknown;
+/**
+ * Extract the command a guarded tool is about to run. The bash tool carries its
+ * command in `output.args.command`; edit/write pass "".
+ *
+ * Pure + side-effect free so it can be unit-tested in isolation.
+ */
+export function extractOpenCodeCommand(args: unknown): string {
+  if (args && typeof args === "object" && "command" in args) {
+    const cmd = (args as Record<string, unknown>).command;
+    return typeof cmd === "string" ? cmd : "";
+  }
+  return "";
 }
 
 /**
- * Extract the command a guarded tool is about to run. Bash carries its command
- * in `output.args.command`; edit/write pass "".
+ * OpenCode plugin (named export). Maintains the active-agent map per session and
+ * registers the pre-tool veto point. **Throws** inside `tool.execute.before` to
+ * block a mutating tool call in the primary checkout (fail closed); returns
+ * normally to allow.
  */
-function extractOpenCodeCommand(event: OpenCodeToolEvent): string {
-  const command = event.output?.args?.command;
-  return typeof command === "string" ? command : "";
-}
-
-/**
- * OpenCode plugin (default export). Maintains the active-agent map and
- * registers the pre-tool veto point.
- */
-export default function worktreeGuard(opencode: OpenCodePluginApi): void {
+export const WorktreeGuard: Plugin = async () => {
   const activeAgentForSession = new Map<string, string>();
 
-  opencode.on("chat.message", (event) => {
-    const { sessionId, agentName } = event;
-    if (typeof sessionId === "string" && typeof agentName === "string") {
-      activeAgentForSession.set(sessionId, agentName);
-    }
-  });
-
-  opencode.on("tool.execute.before", (event) => {
-    const tool = event.tool;
-    if (!tool || !GUARDED_TOOLS.has(tool)) return undefined;
-    const command = extractOpenCodeCommand(event);
-    const isMaster =
-      activeAgentForSession.get(event.sessionId ?? "") === MASTER_AGENT;
-    const env = buildGuardEnv(process.env as Env, isMaster);
-    runGate(command, env); // throws -> fail closed
-    return undefined; // exit 0 -> allow
-  });
-}
+  return {
+    "chat.message": async (input) => {
+      if (input.agent) {
+        activeAgentForSession.set(input.sessionID, input.agent);
+      }
+    },
+    "tool.execute.before": async (input, output) => {
+      if (!GUARDED_TOOLS.has(input.tool)) return;
+      const command = extractOpenCodeCommand(output.args);
+      const isMaster =
+        activeAgentForSession.get(input.sessionID) === MASTER_AGENT;
+      runGate(command, buildGuardEnv(process.env as Env, isMaster));
+    },
+  };
+};

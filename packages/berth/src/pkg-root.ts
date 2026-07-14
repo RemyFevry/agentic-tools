@@ -8,14 +8,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { TOOL_NAME } from "./constants.js";
+import { PKG_NAME, TOOL_NAME } from "./constants.js";
 
 /** A permissive JSON object value. */
 type JsonObject = { [key: string]: unknown };
 
 /**
  * Walk up from this module to the nearest directory whose `package.json`
- * has `name === TOOL_NAME`.
+ * has `name === PKG_NAME`.
  *
  * @throws Error if the package root cannot be located.
  */
@@ -30,7 +30,7 @@ export function findPkgRoot(): string {
           pkg &&
           typeof pkg === "object" &&
           !Array.isArray(pkg) &&
-          (pkg as JsonObject)["name"] === TOOL_NAME
+          (pkg as JsonObject)["name"] === PKG_NAME
         ) {
           return dir;
         }

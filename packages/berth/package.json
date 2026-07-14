@@ -1,6 +1,6 @@
 {
   "name": "@color-sunset/berth",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "A toolkit that turns cooperating AI coding agents into a disciplined, parallel-safe, review-gated development workflow.",
   "license": "MIT",
@@ -50,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@opencode-ai/plugin": "^1.17.10",
     "@types/node": "^20.19.43",
     "@vitest/coverage-v8": "^3.2.7",
     "eslint": "^9.39.5",

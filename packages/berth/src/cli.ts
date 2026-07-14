@@ -17,9 +17,9 @@
 // Run directly:  node packages/berth/dist/cli.js init ./my-repo --runtime claude
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import { findPkgRoot } from "./pkg-root.js";
@@ -272,10 +272,12 @@ function main(): void {
 }
 
 // Run only when invoked directly as the CLI entry, not when imported (for
-// tests). Mirrors the guard pattern in adapters/claude/worktree-guard.mjs.
+// tests). Both sides are realpath'd so the comparison survives the bin symlink
+// (process.argv[1] is the symlink; import.meta.url is the realpath) and macOS
+// /tmp → /private/tmp remapping.
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
 ) {
   main();
 }
