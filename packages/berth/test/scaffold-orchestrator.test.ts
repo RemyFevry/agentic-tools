@@ -47,7 +47,7 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
     rmSync(sandbox, { recursive: true, force: true });
   });
 
-  it("writes master agent defs + orchestration scripts + guard + adapters", () => {
+  it("writes orchestrator agent defs + orchestration scripts + guard + adapters", () => {
     const r = init({ target, withOrchestrator: true });
 
     expect(r.alreadyInstalled).toBe(false);
@@ -62,13 +62,15 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
     ).toBe(true);
 
     // Master agent definitions for each runtime.
-    expect(existsSync(join(target, ".claude", "agents", "master.md"))).toBe(
+    expect(
+      existsSync(join(target, ".claude", "agents", "orchestrator.md")),
+    ).toBe(true);
+    expect(
+      existsSync(join(target, ".opencode", "agent", "orchestrator.md")),
+    ).toBe(true);
+    expect(existsSync(join(target, ".pi", "prompts", "orchestrator.md"))).toBe(
       true,
     );
-    expect(existsSync(join(target, ".opencode", "agent", "master.md"))).toBe(
-      true,
-    );
-    expect(existsSync(join(target, ".pi", "prompts", "master.md"))).toBe(true);
 
     // Orchestration scripts (executable).
     for (const name of [
@@ -84,16 +86,16 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
     }
   });
 
-  it("master agent defs contain BERTH_ and NO FIL_", () => {
+  it("orchestrator agent defs reference berth and NO FIL_", () => {
     init({ target, withOrchestrator: true });
 
     for (const path of [
-      join(target, ".claude", "agents", "master.md"),
-      join(target, ".opencode", "agent", "master.md"),
-      join(target, ".pi", "prompts", "master.md"),
+      join(target, ".claude", "agents", "orchestrator.md"),
+      join(target, ".opencode", "agent", "orchestrator.md"),
+      join(target, ".pi", "prompts", "orchestrator.md"),
     ]) {
       const content = readFileSync(path, "utf8");
-      expect(content).toContain("BERTH_");
+      expect(content.toLowerCase()).toContain("berth");
       expect(content).not.toMatch(/\bFIL_/);
     }
   });
@@ -101,9 +103,9 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
   it("--runtime claude --with-orchestrator writes only the claude master def", () => {
     init({ target, runtimes: ["claude"], withOrchestrator: true });
 
-    expect(existsSync(join(target, ".claude", "agents", "master.md"))).toBe(
-      true,
-    );
+    expect(
+      existsSync(join(target, ".claude", "agents", "orchestrator.md")),
+    ).toBe(true);
     // No opencode/pi master defs created.
     expect(existsSync(join(target, ".opencode", "agent"))).toBe(false);
     expect(existsSync(join(target, ".pi", "prompts"))).toBe(false);
@@ -174,7 +176,7 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
 
   it("--force overwrites the orchestrator install (mtime advances)", async () => {
     init({ target, withOrchestrator: true });
-    const masterAgent = join(target, ".opencode", "agent", "master.md");
+    const masterAgent = join(target, ".opencode", "agent", "orchestrator.md");
     const before = statSync(masterAgent).mtimeMs;
 
     await new Promise((resolve) => setTimeout(resolve, 25));
@@ -200,9 +202,9 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
     expect((thrown as Error).message).toContain("refusing to overwrite");
 
     // Atomicity: nothing else was written.
-    expect(existsSync(join(target, ".opencode", "agent", "master.md"))).toBe(
-      false,
-    );
+    expect(
+      existsSync(join(target, ".opencode", "agent", "orchestrator.md")),
+    ).toBe(false);
     expect(existsSync(join(target, "scripts", "spawn-layer1.sh"))).toBe(false);
   });
 
@@ -210,8 +212,8 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
     const r = init({ target });
     expect(r.orchestratorInstalled).toBe(true);
     expect(existsSync(join(target, "scripts", "master.sh"))).toBe(true);
-    expect(existsSync(join(target, ".claude", "agents", "master.md"))).toBe(
-      true,
-    );
+    expect(
+      existsSync(join(target, ".claude", "agents", "orchestrator.md")),
+    ).toBe(true);
   });
 });

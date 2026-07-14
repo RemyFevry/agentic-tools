@@ -47,8 +47,8 @@ const GATE_SCRIPT_REL = "scripts/require-worktree.sh";
 /** Tools whose execution must be vetted by the trunk guard. */
 const GUARDED_TOOLS = new Set(["edit", "write", "bash"]);
 
-/** The agent name trusted to run inside the primary checkout. */
-const MASTER_AGENT = "master";
+/** The agent name trusted to orchestrate (run bash) inside the primary checkout. */
+const ORCHESTRATOR_AGENT = "orchestrator";
 
 /**
  * Build the environment a guarded child process should run with.
@@ -56,10 +56,10 @@ const MASTER_AGENT = "master";
  * Inlined copy of `src/guard/build-env.ts` (that file is the source of truth —
  * keep them identical).
  *
- * - master session: inherit the parent env AND assert master status by setting
- *   `BERTH_MASTER_SESSION=1`.
- * - non-master session: inherit the parent env BUT delete BOTH master hatches
- *   (`BERTH_ALLOW_MAIN_WORKTREE` and `BERTH_MASTER_SESSION`) so a non-master
+ * - orchestrator session: inherit the parent env AND assert orchestrator status
+ *   by setting `BERTH_MASTER_SESSION=1`.
+ * - non-orchestrator session: inherit the parent env BUT delete BOTH hatches
+ *   (`BERTH_ALLOW_MAIN_WORKTREE` and `BERTH_MASTER_SESSION`) so a non-orchestrator
  *   can never satisfy either hatch merely by inheritance.
  *
  * Unrelated keys are always preserved. The input env is never mutated.
@@ -202,7 +202,11 @@ export function extractWorkDir(args: unknown): string | undefined {
  * normally to allow.
  *
  * An agent with no registered name (no `chat.message` received yet) defaults to
- * **master** — it's the orchestrator that owns the primary checkout.
+ * **orchestrator** — it's the layer-0 agent that owns the primary checkout.
+ *
+ * The orchestrator is trusted for **bash only** (orchestration commands).
+ * Edit/write are NEVER given the hatch — the orchestrator delegates file
+ * mutations to subagents in worktrees.
  */
 export const WorktreeGuard: Plugin = async () => {
   const activeAgentForSession = new Map<string, string>();
@@ -218,8 +222,12 @@ export const WorktreeGuard: Plugin = async () => {
       const command = extractOpenCodeCommand(output.args);
       const cwd = extractWorkDir(output.args);
       const agent = activeAgentForSession.get(input.sessionID);
-      const isMaster = agent === undefined || agent === MASTER_AGENT;
-      runGate(command, buildGuardEnv(process.env as Env, isMaster), cwd);
+      const isOrchestrator =
+        agent === undefined || agent === ORCHESTRATOR_AGENT;
+      // Orchestrator gets the hatch for bash only. Edit/write always go
+      // through the worktree check (blocked in primary, allowed in worktree).
+      const trusted = isOrchestrator && input.tool === "bash";
+      runGate(command, buildGuardEnv(process.env as Env, trusted), cwd);
     },
   };
 };

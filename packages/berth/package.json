@@ -1,6 +1,6 @@
 {
   "name": "@color-sunset/berth",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "A toolkit that turns cooperating AI coding agents into a disciplined, parallel-safe, review-gated development workflow.",
   "license": "MIT",

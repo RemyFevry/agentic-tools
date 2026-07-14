@@ -232,21 +232,23 @@ const ORCHESTRATOR_SCRIPT_NAMES = [
   "ship.sh",
 ] as const;
 
-/** Map each runtime to its source master-agent-definition template. */
-function masterAgentSources(pkgRoot: string): Record<Runtime, string> {
+/** Map each runtime to its source orchestrator-agent-definition template. */
+function orchestratorAgentSources(pkgRoot: string): Record<Runtime, string> {
   return {
-    claude: join(pkgRoot, "adapters", "claude", "master.md"),
-    opencode: join(pkgRoot, "adapters", "opencode", "master.md"),
-    pi: join(pkgRoot, "adapters", "pi", "master.md"),
+    claude: join(pkgRoot, "adapters", "claude", "orchestrator.md"),
+    opencode: join(pkgRoot, "adapters", "opencode", "orchestrator.md"),
+    pi: join(pkgRoot, "adapters", "pi", "orchestrator.md"),
   };
 }
 
-/** Map each runtime to its destination master-agent path inside the target. */
-function masterAgentDestinations(target: string): Record<Runtime, string> {
+/** Map each runtime to its destination orchestrator-agent path inside the target. */
+function orchestratorAgentDestinations(
+  target: string,
+): Record<Runtime, string> {
   return {
-    claude: join(target, ".claude", "agents", "master.md"),
-    opencode: join(target, ".opencode", "agent", "master.md"),
-    pi: join(target, ".pi", "prompts", "master.md"),
+    claude: join(target, ".claude", "agents", "orchestrator.md"),
+    opencode: join(target, ".opencode", "agent", "orchestrator.md"),
+    pi: join(target, ".pi", "prompts", "orchestrator.md"),
   };
 }
 
@@ -342,14 +344,16 @@ export function init(options: InitOptions): InitResult {
   }
   const guardSrc = join(pkgRoot, "scripts", "require-worktree.sh");
   const srcMap = adapterSources(pkgRoot);
-  const masterSrcMap = withOrchestrator ? masterAgentSources(pkgRoot) : null;
+  const orchestratorSrcMap = withOrchestrator
+    ? orchestratorAgentSources(pkgRoot)
+    : null;
   const orchestratorScriptSrcs = withOrchestrator
     ? ORCHESTRATOR_SCRIPT_NAMES.map((n) => join(pkgRoot, "scripts", n))
     : [];
   const requiredTemplates = [
     guardSrc,
     ...runtimes.map((r) => srcMap[r]),
-    ...(masterSrcMap ? runtimes.map((r) => masterSrcMap[r]) : []),
+    ...(orchestratorSrcMap ? runtimes.map((r) => orchestratorSrcMap[r]) : []),
     ...orchestratorScriptSrcs,
   ];
   for (const path of requiredTemplates) {
@@ -369,7 +373,7 @@ export function init(options: InitOptions): InitResult {
     ...runtimes.map((r) => ({ src: srcMap[r], dest: destMap[r] })),
   ];
   if (withOrchestrator) {
-    const masterDestMap = masterAgentDestinations(target);
+    const orchestratorDestMap = orchestratorAgentDestinations(target);
     copies.push(
       ...ORCHESTRATOR_SCRIPT_NAMES.map((name) => ({
         src: join(pkgRoot, "scripts", name),
@@ -377,8 +381,8 @@ export function init(options: InitOptions): InitResult {
         mode: 0o755,
       })),
       ...runtimes.map((r) => ({
-        src: masterSrcMap![r],
-        dest: masterDestMap[r],
+        src: orchestratorSrcMap![r],
+        dest: orchestratorDestMap[r],
       })),
     );
   }

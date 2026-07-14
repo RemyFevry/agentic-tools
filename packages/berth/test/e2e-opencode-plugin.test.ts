@@ -125,7 +125,7 @@ describe("OpenCode WorktreeGuard plugin (hook contract + e2e)", () => {
     expect(typeof hooks["chat.message"]).toBe("function");
   });
 
-  // --- block / allow in the primary checkout (non-master agent) -------------
+  // --- block / allow in the primary checkout (non-orchestrator agent) --------
 
   it("blocks an edit in the primary checkout (fail closed)", async () => {
     process.chdir(primary);
@@ -183,34 +183,52 @@ describe("OpenCode WorktreeGuard plugin (hook contract + e2e)", () => {
     ).resolves.toBeUndefined();
   });
 
-  // --- agent-aware env building --------------------------------------------
+  // --- orchestrator: bash-only hatch (edit/write always blocked in primary) -
 
-  it("default (unregistered) agent is treated as master: edit in primary ALLOWED", async () => {
+  it("default (unregistered) agent: bash in primary ALLOWED (orchestrator)", async () => {
     process.chdir(primary);
-    // No registerAgent call — session has no agent name → defaults to master.
-    await expect(runToolBefore("edit", {})).resolves.toBeUndefined();
-  });
-
-  it("master agent: edit in the primary checkout is ALLOWED", async () => {
-    process.chdir(primary);
-    await registerAgent("master-sess", "master");
     await expect(
-      runToolBefore("edit", {}, "master-sess"),
+      runToolBefore("bash", { command: "echo hi > f" }),
     ).resolves.toBeUndefined();
   });
 
+  it("default (unregistered) agent: edit in primary BLOCKED (bash-only hatch)", async () => {
+    process.chdir(primary);
+    await expect(runToolBefore("edit", {})).rejects.toThrow(/blocked/);
+  });
+
+  it("default (unregistered) agent: write in primary BLOCKED (bash-only hatch)", async () => {
+    process.chdir(primary);
+    await expect(runToolBefore("write", {})).rejects.toThrow(/blocked/);
+  });
+
+  it("registered orchestrator agent: bash in primary ALLOWED", async () => {
+    process.chdir(primary);
+    await registerAgent("orch-sess", "orchestrator");
+    await expect(
+      runToolBefore("bash", { command: "echo hi > f" }, "orch-sess"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("registered orchestrator agent: edit in primary BLOCKED", async () => {
+    process.chdir(primary);
+    await registerAgent("orch-sess", "orchestrator");
+    await expect(runToolBefore("edit", {}, "orch-sess")).rejects.toThrow(
+      /blocked/,
+    );
+  });
+
   it(
-    "non-master: a BERTH_MASTER_SESSION hatch in process.env is scrubbed " +
-      "(can never satisfy the master hatch by inheritance)",
+    "non-orchestrator: a BERTH_MASTER_SESSION hatch in process.env is scrubbed " +
+      "(can never satisfy the hatch by inheritance)",
     async () => {
       process.chdir(primary);
-      // A launcher set the master hatch in the ambient env…
       process.env.BERTH_MASTER_SESSION = "1";
-      // …but the active agent is NOT master, so buildGuardEnv must scrub it.
       await registerAgent("layer1-sess", "layer1");
-      await expect(runToolBefore("edit", {}, "layer1-sess")).rejects.toThrow(
-        /blocked/,
-      );
+      // Even bash is blocked for a non-orchestrator, despite the hatch in env.
+      await expect(
+        runToolBefore("bash", { command: "echo hi" }, "layer1-sess"),
+      ).rejects.toThrow(/blocked/);
     },
   );
 

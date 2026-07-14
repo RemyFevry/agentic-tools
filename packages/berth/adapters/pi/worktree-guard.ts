@@ -24,6 +24,8 @@ export type Env = Record<string, string | undefined>;
 
 // Naming (mirror of src/constants.ts; inlined so this file is standalone).
 const ENV_PREFIX = "BERTH_";
+const ALLOW_MAIN_WORKTREE_ENV = `${ENV_PREFIX}ALLOW_MAIN_WORKTREE`;
+const MASTER_SESSION_ENV = `${ENV_PREFIX}MASTER_SESSION`;
 const GATE_SCRIPT_ENV = `${ENV_PREFIX}GATE_SCRIPT`;
 const GATE_SCRIPT_REL = "scripts/require-worktree.sh";
 
@@ -200,6 +202,9 @@ export function extractPiWorkDir(
 /**
  * Pi extension (default-export factory). Registers a `tool_call` listener that
  * vets `edit`/`write`/`bash` against the trunk guard.
+ *
+ * Edit/write never inherit the orchestrator hatches — the orchestrator
+ * delegates file mutations to subagents. Bash forwards env unchanged.
  */
 export default function worktreeGuard(pi: PiPluginApi): void {
   pi.on("tool_call", (event) => {
@@ -207,6 +212,11 @@ export default function worktreeGuard(pi: PiPluginApi): void {
     if (!tool || !GUARDED_TOOLS.has(tool)) return undefined;
     const command = extractPiCommand(event);
     const cwd = extractPiWorkDir(event);
-    return runGate(command, process.env as Env, cwd);
+    const env: Env = { ...process.env };
+    if (tool !== "bash") {
+      delete env[ALLOW_MAIN_WORKTREE_ENV];
+      delete env[MASTER_SESSION_ENV];
+    }
+    return runGate(command, env, cwd);
   });
 }
