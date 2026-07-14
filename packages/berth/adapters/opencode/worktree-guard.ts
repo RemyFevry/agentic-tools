@@ -31,6 +31,8 @@ import {
   spawnSync,
   type SpawnSyncReturns,
 } from "node:child_process";
+import { statSync } from "node:fs";
+import { dirname } from "node:path";
 
 /** A process environment. */
 export type Env = Record<string, string | undefined>;
@@ -100,10 +102,12 @@ function spawnGate(
   gatePath: string,
   command: string,
   env: Env,
+  cwd?: string,
 ): SpawnSyncReturns<string> {
   try {
     return spawnSync("bash", [gatePath, command], {
       env,
+      cwd,
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf8",
     });
@@ -117,14 +121,14 @@ function spawnGate(
  * unexpected code, spawn error, or missing gate. Returns normally on exit 0
  * (allow). The thrown message embeds the guard's stderr.
  */
-function runGate(command: string, env: Env): void {
+function runGate(command: string, env: Env, cwd?: string): void {
   const gatePath = resolveGateScript();
   if (!gatePath) {
     throw new Error(
       `berth: could not locate the trunk-guard script (set ${GATE_SCRIPT_ENV} or run inside a git repo). Blocking.`,
     );
   }
-  const result = spawnGate(gatePath, command, env);
+  const result = spawnGate(gatePath, command, env, cwd);
   if (result.error) {
     throw new Error(
       `berth: failed to run the trunk guard: ${String(result.error)}`,
@@ -151,11 +155,54 @@ export function extractOpenCodeCommand(args: unknown): string {
   return "";
 }
 
+/** Return `p` if it is an existing directory, else `undefined`. */
+function validDir(p: string | undefined): string | undefined {
+  if (!p) return undefined;
+  try {
+    return statSync(p).isDirectory() ? p : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Extract the target working directory from a tool call's args, so the guard
+ * checks the directory the tool will actually operate in — not just
+ * `process.cwd()`. This lets a master agent on main safely target a linked
+ * worktree (the guard sees `.git` as a file → allows).
+ *
+ *   bash     → args.workdir or args.cwd
+ *   write/edit → dirname(args.filePath) or dirname(args.path)
+ *   fallback → undefined (caller uses process.cwd())
+ */
+export function extractWorkDir(args: unknown): string | undefined {
+  if (!args || typeof args !== "object") return undefined;
+  const a = args as Record<string, unknown>;
+  const direct =
+    typeof a.workdir === "string"
+      ? a.workdir
+      : typeof a.cwd === "string"
+        ? a.cwd
+        : undefined;
+  if (direct) return validDir(direct);
+  const filePath =
+    typeof a.filePath === "string"
+      ? a.filePath
+      : typeof a.path === "string"
+        ? a.path
+        : undefined;
+  if (filePath) return validDir(dirname(filePath));
+  return undefined;
+}
+
 /**
  * OpenCode plugin (named export). Maintains the active-agent map per session and
  * registers the pre-tool veto point. **Throws** inside `tool.execute.before` to
  * block a mutating tool call in the primary checkout (fail closed); returns
  * normally to allow.
+ *
+ * An agent with no registered name (no `chat.message` received yet) defaults to
+ * **master** — it's the orchestrator that owns the primary checkout.
  */
 export const WorktreeGuard: Plugin = async () => {
   const activeAgentForSession = new Map<string, string>();
@@ -169,9 +216,10 @@ export const WorktreeGuard: Plugin = async () => {
     "tool.execute.before": async (input, output) => {
       if (!GUARDED_TOOLS.has(input.tool)) return;
       const command = extractOpenCodeCommand(output.args);
-      const isMaster =
-        activeAgentForSession.get(input.sessionID) === MASTER_AGENT;
-      runGate(command, buildGuardEnv(process.env as Env, isMaster));
+      const cwd = extractWorkDir(output.args);
+      const agent = activeAgentForSession.get(input.sessionID);
+      const isMaster = agent === undefined || agent === MASTER_AGENT;
+      runGate(command, buildGuardEnv(process.env as Env, isMaster), cwd);
     },
   };
 };

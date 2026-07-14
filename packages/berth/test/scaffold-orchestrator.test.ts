@@ -206,12 +206,12 @@ describe("scaffold.init --with-orchestrator (mock-free, real tempdirs)", () => {
     expect(existsSync(join(target, "scripts", "spawn-layer1.sh"))).toBe(false);
   });
 
-  it("guard-only init (no --with-orchestrator) writes no orchestrator files", () => {
+  it("init without explicit --with-orchestrator still installs orchestrator files (now the default)", () => {
     const r = init({ target });
-    expect(r.orchestratorInstalled).toBe(false);
-    expect(existsSync(join(target, "scripts", "master.sh"))).toBe(false);
+    expect(r.orchestratorInstalled).toBe(true);
+    expect(existsSync(join(target, "scripts", "master.sh"))).toBe(true);
     expect(existsSync(join(target, ".claude", "agents", "master.md"))).toBe(
-      false,
+      true,
     );
   });
 });

@@ -75,7 +75,7 @@ export function resolveOrchestratorScript(
 const USAGE = `berth — trunk guard + orchestrator
 
 Usage:
-  berth init [target] [--runtime <list>] [--force] [--with-orchestrator]
+  berth init [target] [--runtime <list>] [--force]
   berth master [runtime]
   berth layer1 <name> <branch> [runtime]
   berth layer2 <name> [runtime]
@@ -83,7 +83,7 @@ Usage:
   berth ship
 
 Subcommands:
-  init       install the trunk guard + adapters into a repo
+  init       install the trunk guard + adapters + orchestrator into a repo
   master     launch the layer-0 master orchestrator in the primary checkout
   layer1     master spawns a layer-1 subagent (new tab + new worktree)
   layer2     a layer-1 spawns a layer-2 subagent (pane split, shared worktree)
@@ -93,7 +93,6 @@ Subcommands:
 Init options:
   --runtime <list>       comma-separated subset of: claude,opencode,pi  (default: all)
   --force                overwrite an existing install
-  --with-orchestrator    also install the master agent defs + spawn scripts
   -h, --help             show this help
 
 Runtime (master/layer1/layer2): opencode (default) | claude | pi
@@ -162,14 +161,12 @@ function formatResult(r: InitResult): string {
 interface CliValues {
   runtime?: string;
   force?: boolean;
-  withOrchestrator?: boolean;
   help?: boolean;
 }
 
 function runInit(positionals: string[], values: CliValues): void {
   const target = positionals[1] ?? process.cwd();
   const force = values.force === true;
-  const withOrchestrator = values.withOrchestrator === true;
 
   let runtimes: readonly Runtime[];
   try {
@@ -182,7 +179,7 @@ function runInit(positionals: string[], values: CliValues): void {
 
   let result: InitResult;
   try {
-    result = init({ target, runtimes, force, withOrchestrator });
+    result = init({ target, runtimes, force });
   } catch (e) {
     if (e instanceof InitError) {
       process.stderr.write(`${e.message}\n`);
@@ -234,7 +231,6 @@ function main(): void {
       options: {
         runtime: { type: "string" },
         force: { type: "boolean" },
-        withOrchestrator: { type: "boolean" },
         help: { type: "boolean", short: "h" },
       },
     });

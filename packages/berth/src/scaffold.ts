@@ -50,7 +50,9 @@ export interface InitOptions {
   runtimes?: readonly Runtime[];
   /** Overwrite an existing install. */
   force?: boolean;
-  /** Also install the master agent defs + orchestration scripts. */
+  /** Also install the master agent defs + orchestration scripts.
+   * @deprecated Always installed now; this flag is accepted for backward
+   *   compatibility but has no effect. */
   withOrchestrator?: boolean;
 }
 
@@ -299,7 +301,7 @@ function mergeOrchestratorPnpmScripts(target: string): string | null {
  */
 export function init(options: InitOptions): InitResult {
   const force = options.force === true;
-  const withOrchestrator = options.withOrchestrator === true;
+  const withOrchestrator = true; // Always install the orchestrator.
   const runtimes =
     options.runtimes && options.runtimes.length > 0
       ? options.runtimes

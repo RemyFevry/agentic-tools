@@ -125,20 +125,23 @@ describe("OpenCode WorktreeGuard plugin (hook contract + e2e)", () => {
     expect(typeof hooks["chat.message"]).toBe("function");
   });
 
-  // --- block / allow in the primary checkout --------------------------------
+  // --- block / allow in the primary checkout (non-master agent) -------------
 
   it("blocks an edit in the primary checkout (fail closed)", async () => {
     process.chdir(primary);
+    await registerAgent("s1", "worker");
     await expect(runToolBefore("edit", {})).rejects.toThrow(/blocked/);
   });
 
   it("blocks a write in the primary checkout", async () => {
     process.chdir(primary);
+    await registerAgent("s1", "worker");
     await expect(runToolBefore("write", {})).rejects.toThrow(/blocked/);
   });
 
   it("blocks a mutating bash command in the primary checkout", async () => {
     process.chdir(primary);
+    await registerAgent("s1", "worker");
     await expect(
       runToolBefore("bash", { command: "echo hi > f" }),
     ).rejects.toThrow(/blocked/);
@@ -160,6 +163,7 @@ describe("OpenCode WorktreeGuard plugin (hook contract + e2e)", () => {
 
   it("blocks a command-smuggling bash string in the primary checkout", async () => {
     process.chdir(primary);
+    await registerAgent("s1", "worker");
     await expect(
       runToolBefore("bash", { command: "wt switch foo; rm -rf /" }),
     ).rejects.toThrow();
@@ -180,6 +184,12 @@ describe("OpenCode WorktreeGuard plugin (hook contract + e2e)", () => {
   });
 
   // --- agent-aware env building --------------------------------------------
+
+  it("default (unregistered) agent is treated as master: edit in primary ALLOWED", async () => {
+    process.chdir(primary);
+    // No registerAgent call — session has no agent name → defaults to master.
+    await expect(runToolBefore("edit", {})).resolves.toBeUndefined();
+  });
 
   it("master agent: edit in the primary checkout is ALLOWED", async () => {
     process.chdir(primary);
@@ -203,4 +213,31 @@ describe("OpenCode WorktreeGuard plugin (hook contract + e2e)", () => {
       );
     },
   );
+
+  // --- workdir-aware guard (issue: guard must check the tool's target dir) --
+
+  it("non-master bash with workdir in a linked worktree is ALLOWED from primary", async () => {
+    process.chdir(primary);
+    await registerAgent("s1", "worker");
+    await expect(
+      runToolBefore("bash", { command: "echo hi > f", workdir: linked }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("non-master write with filePath in a linked worktree is ALLOWED from primary", async () => {
+    process.chdir(primary);
+    await registerAgent("s1", "worker");
+    await expect(
+      runToolBefore("write", { filePath: `${linked}/test.txt` }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("non-master bash with workdir in primary is BLOCKED", async () => {
+    process.chdir(linked); // process.cwd() is the worktree, but…
+    await registerAgent("s1", "worker");
+    // …the tool call targets the primary checkout explicitly.
+    await expect(
+      runToolBefore("bash", { command: "echo hi > f", workdir: primary }),
+    ).rejects.toThrow(/blocked/);
+  });
 });

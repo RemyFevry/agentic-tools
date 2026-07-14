@@ -16,6 +16,8 @@ import {
   spawnSync,
   type SpawnSyncReturns,
 } from "node:child_process";
+import { statSync } from "node:fs";
+import { dirname } from "node:path";
 
 /** A process environment. */
 export type Env = Record<string, string | undefined>;
@@ -117,10 +119,12 @@ function spawnGate(
   gatePath: string,
   command: string,
   env: Env,
+  cwd?: string,
 ): SpawnSyncReturns<string> {
   try {
     return spawnSync("bash", [gatePath, command], {
       env,
+      cwd,
       stdio: ["ignore", "pipe", "pipe"],
       encoding: "utf8",
     });
@@ -134,7 +138,11 @@ function spawnGate(
  * (allow); otherwise a `{ block: true, reason }` carrying the guard's stderr
  * (fail closed on exit 2, unexpected code, spawn error, or missing guard).
  */
-function runGate(command: string, env: Env): PiToolCallResult | undefined {
+function runGate(
+  command: string,
+  env: Env,
+  cwd?: string,
+): PiToolCallResult | undefined {
   const gatePath = resolveGateScript();
   if (!gatePath) {
     return {
@@ -143,7 +151,7 @@ function runGate(command: string, env: Env): PiToolCallResult | undefined {
     };
   }
   try {
-    const result = spawnGate(gatePath, command, env);
+    const result = spawnGate(gatePath, command, env, cwd);
     if (result.error) {
       return {
         block: true,
@@ -165,6 +173,30 @@ function runGate(command: string, env: Env): PiToolCallResult | undefined {
   }
 }
 
+/** Return `p` if it is an existing directory, else `undefined`. */
+function validDir(p: string | undefined): string | undefined {
+  if (!p) return undefined;
+  try {
+    return statSync(p).isDirectory() ? p : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Extract the target working directory from a Pi tool_call event, so the guard
+ * checks the directory the tool will actually operate in. For write/edit the
+ * file path is in `event.input.path`; bash has no per-call workdir in Pi.
+ */
+export function extractPiWorkDir(
+  event: PiToolCallEvent | null | undefined,
+): string | undefined {
+  if (!event?.input) return undefined;
+  const path = event.input.path;
+  if (typeof path === "string") return validDir(dirname(path));
+  return undefined;
+}
+
 /**
  * Pi extension (default-export factory). Registers a `tool_call` listener that
  * vets `edit`/`write`/`bash` against the trunk guard.
@@ -174,6 +206,7 @@ export default function worktreeGuard(pi: PiPluginApi): void {
     const tool = event.toolName;
     if (!tool || !GUARDED_TOOLS.has(tool)) return undefined;
     const command = extractPiCommand(event);
-    return runGate(command, process.env as Env);
+    const cwd = extractPiWorkDir(event);
+    return runGate(command, process.env as Env, cwd);
   });
 }
